@@ -1,27 +1,53 @@
-deploy:
-  runs-on: ubuntu-latest
-  needs: build
-  permissions:
-    id-token: write
-    contents: read
+name: Deploy .NET App to Azure
 
-  steps:
-    - name: Download artifact from build job
-      uses: actions/download-artifact@v4
-      with:
-        name: .net-app
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
 
-    - name: Login to Azure
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_FD2D5377AE2B4DC1834E7F6B8DEDC1FB }}
-        tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3BFEA7EC4ABA4BA1BAE84F2EFC2AAA44 }}
-        subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_79502634A89F417DA0E5067A485B2CB1 }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Deploy to Azure Web App
-      id: deploy-to-webapp
-      uses: azure/webapps-deploy@v3
-      with:
-        app-name: 'mywebappdeploy6'
-        slot-name: 'Production'
-        package: .net-app
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: Build App
+        run: dotnet build --configuration Release
+
+      - name: Publish App
+        run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
+
+      - name: Upload files for deploy
+        uses: actions/upload-artifact@v4
+        with:
+          name: .net-app
+          path: ${{env.DOTNET_ROOT}}/myapp
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download published app
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.YOUR_CLIENT_ID }}
+          tenant-id: ${{ secrets.YOUR_TENANT_ID }}
+          subscription-id: ${{ secrets.YOUR_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'mywebappdeploy6'
+          slot-name: 'Production'
+          package: .net-app
